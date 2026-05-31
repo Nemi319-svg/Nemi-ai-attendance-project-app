@@ -16,3 +16,4 @@ segno
 pillow
 
 streamlit
+resemblyzer
