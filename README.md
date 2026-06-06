@@ -18,12 +18,3 @@ A modern, interactive classroom management system built with Python and Streamli
 * **Machine Learning & Vision:** Scikit-learn, Face_recognition, OpenCV, Dlib
 * **Data Processing:** NumPy, Pandas
 * **Security:** Bcrypt
-
-## 🚀 Installation & Setup
-
-Follow these steps to run the project locally on your machine.
-
-**1. Clone the repository:**
-```bash
-git clone [https://github.com/Nemi319-svg/snap-class-app.git](https://github.com/Nemi319-svg/snap-class-app.git)
-cd snap-class-app
