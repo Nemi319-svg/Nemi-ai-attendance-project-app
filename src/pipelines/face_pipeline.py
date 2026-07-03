@@ -1,5 +1,3 @@
-
-
 import dlib
 import numpy as np
 import face_recognition_models
@@ -8,11 +6,9 @@ import streamlit as st
 
 from src.database.db import get_all_students
 
-
 @st.cache_resource
 def load_dlib_models():
     detector = dlib.get_frontal_face_detector() 
-
 
     sp = dlib.shape_predictor(
         face_recognition_models.pose_predictor_model_location()
@@ -28,20 +24,20 @@ def get_face_embeddings(image_np):
     detector, sp, facerec = load_dlib_models()
     faces = detector(image_np, 1)
 
-    encodings= []
+    encodings = []
 
     for face in faces:
         shape = sp(image_np, face)
-        face_descriptor = facerec.compute_face_descriptor(image_np, shape, 1) #128 embedding
-
+        # Generate 128-dimensional embedding
+        face_descriptor = facerec.compute_face_descriptor(image_np, shape, 1) 
         encodings.append(np.array(face_descriptor))
+        
     return encodings
 
 @st.cache_resource
 def get_trained_model():
     X = []
     y = []
-
 
     student_db = get_all_students()
 
@@ -54,8 +50,8 @@ def get_trained_model():
             X.append(np.array(embedding))
             y.append(student.get('student_id'))
 
-    if len(X) ==0:
-        return 0
+    if len(X) == 0:
+        return None
     
     clf = SVC(kernel='linear', probability=True, class_weight='balanced')
 
@@ -64,8 +60,7 @@ def get_trained_model():
     except ValueError:
         pass
 
-    return {'clf': clf, 'X':X, "y":y}
-
+    return {'clf': clf, 'X': X, "y": y}
 
 def train_classifier():
     st.cache_resource.clear()
@@ -74,9 +69,7 @@ def train_classifier():
 
 def predict_attendance(class_image_np):
     encodings = get_face_embeddings(class_image_np)
-
     detected_student = {}
-
 
     model_data = get_trained_model()
 
@@ -88,19 +81,28 @@ def predict_attendance(class_image_np):
     y_train = model_data['y']
 
     all_students = sorted(list(set(y_train)))
+    
+    # Stricter distance threshold to prevent cross-user false positives
+    RESEMBLANCE_THRESHOLD = 0.45 
 
     for encoding in encodings:
-        if len(all_students)>= 2:
-            predicted_id= int(clf.predict([encoding])[0])
+        # 1. Determine the suspected ID using SVM (if multiple users exist)
+        if len(all_students) >= 2:
+            predicted_id = int(clf.predict([encoding])[0])
         else:
             predicted_id = int(all_students[0])
 
-        student_embedding = X_train[y_train.index(predicted_id)]
+        # 2. Extract ALL embeddings belonging to this specific student
+        student_embeddings = [X_train[i] for i, uid in enumerate(y_train) if uid == predicted_id]
 
-        best_match_score = np.linalg.norm(student_embedding - encoding)
+        # 3. Calculate Euclidean distance to all their registered photos
+        distances = [np.linalg.norm(emb - encoding) for emb in student_embeddings]
+        
+        # 4. Find the closest match score among their photos
+        best_match_score = min(distances) if distances else float('inf')
 
-        resemblance_threshold = 0.6
-
-        if best_match_score <= resemblance_threshold:
+        # 5. Strict Validation
+        if best_match_score <= RESEMBLANCE_THRESHOLD:
             detected_student[predicted_id] = True
+
     return detected_student, all_students, len(encodings)
